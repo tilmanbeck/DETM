@@ -150,6 +150,8 @@ for i, word in enumerate(vocab):
 embeddings = torch.from_numpy(embeddings).to(device)
 args.embeddings_dim = embeddings.size()
 
+times = [0, 5, 10, 15]
+
 print('\n')
 print('=*'*100)
 print('Training a Dynamic Embedded Topic Model on {} with the following settings: {}'.format(args.dataset.upper(), args))
@@ -248,7 +250,7 @@ def train(epoch):
             epoch, lr, cur_kl_theta, cur_kl_eta, cur_kl_alpha, cur_nll, cur_loss))
     print('*'*100)
 
-def visualize():
+def visualize(times):
     """Visualizes topics and embeddings and word usage evolution.
     """
     model.eval()
@@ -259,27 +261,26 @@ def visualize():
         print('\n')
         print('#'*100)
         print('Visualize topics...')
-        times = [0, 10, 40]
         topics_words = []
         for k in range(args.num_topics):
             for t in times:
                 gamma = beta[k, t, :]
-                top_words = list(gamma.cpu().numpy().argsort()[-args.num_words+1:][::-1])
+                top_words = list(gamma.detach().numpy().argsort()[-args.num_words+1:][::-1])
                 topic_words = [vocab[a] for a in top_words]
                 topics_words.append(' '.join(topic_words))
                 print('Topic {} .. Time: {} ===> {}'.format(k, t, topic_words)) 
 
         print('\n')
-        print('Visualize word embeddings ...')
-        queries = ['economic', 'assembly', 'security', 'management', 'debt', 'rights',  'africa']
-        try:
-            embeddings = model.rho.weight  # Vocab_size x E
-        except:
-            embeddings = model.rho         # Vocab_size x E
-        neighbors = []
-        for word in queries:
-            print('word: {} .. neighbors: {}'.format(
-                word, nearest_neighbors(word, embeddings, vocab, args.num_words)))
+        # print('Visualize word embeddings ...')
+        # queries = ['economic', 'assembly', 'security', 'management', 'debt', 'rights',  'africa']
+        # try:
+        #     embeddings = model.rho.weight  # Vocab_size x E
+        # except:
+        #     embeddings = model.rho         # Vocab_size x E
+        # neighbors = []
+        # for word in queries:
+        #     print('word: {} .. neighbors: {}'.format(
+        #         word, nearest_neighbors(word, embeddings, vocab, args.num_words)))
         print('#'*100)
 
         # print('\n')
@@ -426,7 +427,7 @@ def _diversity_helper(beta, num_tops):
     list_w = np.zeros((args.num_topics, num_tops))
     for k in range(args.num_topics):
         gamma = beta[k, :]
-        top_words = gamma.cpu().numpy().argsort()[-num_tops:][::-1]
+        top_words = gamma.detach().numpy().argsort()[-num_tops:][::-1]
         list_w[k, :] = top_words
     list_w = np.reshape(list_w, (-1))
     list_w = list(list_w)
@@ -459,7 +460,7 @@ def get_topic_quality():
         TC_all = []
         cnt_all = []
         for tt in range(args.num_times):
-            tc, cnt = get_topic_coherence(beta[:, tt, :].cpu().numpy(), train_tokens, vocab)
+            tc, cnt = get_topic_coherence(beta[:, tt, :].detach().numpy(), train_tokens, vocab)
             TC_all.append(tc)
             cnt_all.append(cnt)
         print('TC_all: ', TC_all)
@@ -479,7 +480,7 @@ if args.mode == 'train':
     for epoch in range(1, args.epochs):
         train(epoch)
         if epoch % args.visualize_every == 0:
-            visualize()
+            visualize(times)
         val_ppl = get_completion_ppl('val')
         print('val_ppl: ', val_ppl)
         if val_ppl < best_val_ppl:
@@ -500,11 +501,11 @@ if args.mode == 'train':
     with torch.no_grad():
         print('saving topic matrix beta...')
         alpha = model.mu_q_alpha
-        beta = model.get_beta(alpha).cpu().numpy()
+        beta = model.get_beta(alpha).detach().numpy()
         scipy.io.savemat(ckpt+'_beta.mat', {'values': beta}, do_compression=True)
         if args.train_embeddings:
             print('saving word embedding matrix rho...')
-            rho = model.rho.weight.cpu().numpy()
+            rho = model.rho.weight.detach().numpy()
             scipy.io.savemat(ckpt+'_rho.mat', {'values': rho}, do_compression=True)
         print('computing validation perplexity...')
         val_ppl = get_completion_ppl('val')
@@ -517,8 +518,9 @@ else:
         
     print('saving alpha...')
     with torch.no_grad():
-        alpha = model.mu_q_alpha.cpu().numpy()
+        alpha = model.mu_q_alpha.detach().numpy()
         scipy.io.savemat(ckpt+'_alpha.mat', {'values': alpha}, do_compression=True)
+
 
     print('computing validation perplexity...')
     val_ppl = get_completion_ppl('val')
@@ -527,4 +529,5 @@ else:
     print('computing topic coherence and topic diversity...')
     get_topic_quality()
     print('visualizing topics and embeddings...')
-    visualize()
+    visualize(times)
+
