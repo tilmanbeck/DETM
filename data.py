@@ -77,6 +77,29 @@ def get_data(path, temporal=False):
 
     return vocab, train, valid, test
 
+def get_all_data(path, temporal=False):
+        ### load vocabulary
+    with open(os.path.join(path, 'vocab.pkl'), 'rb') as f:
+        vocab = pickle.load(f)
+
+    if not temporal:
+        token_file = os.path.join(path, 'bow_tokens.mat')
+        count_file = os.path.join(path, 'bow_counts.mat')
+        tokens = scipy.io.loadmat(token_file)['tokens'].squeeze()
+        counts = scipy.io.loadmat(count_file)['counts'].squeeze()
+        data = {'tokens': tokens, 'counts': counts}
+    else:
+        token_file = os.path.join(path, 'bow_tokens.mat')
+        count_file = os.path.join(path, 'bow_counts.mat')
+        time_file = os.path.join(path, 'bow_timestamps.mat')
+
+        tokens = scipy.io.loadmat(token_file)['tokens'].squeeze()
+        counts = scipy.io.loadmat(count_file)['counts'].squeeze()
+        times = scipy.io.loadmat(time_file)['timestamps'].squeeze()
+        data = {'tokens': tokens, 'counts': counts, 'times': times}
+
+    return vocab, data
+
 def get_batch(tokens, counts, ind, vocab_size, emsize=300, temporal=False, times=None):
     """fetch input data by batch."""
     batch_size = len(ind)

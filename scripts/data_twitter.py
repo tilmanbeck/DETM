@@ -37,6 +37,7 @@ with open('/home/beck/Repositories/Data/trec2011_microblog/trec2011_2012_final.t
     line_count = 0
     all_timestamps_ini = []
     all_docs_ini = []
+    all_topic_ids = []
     for row in csv_reader:
         # skip header#
         if(line_count>0):
@@ -45,6 +46,7 @@ with open('/home/beck/Repositories/Data/trec2011_microblog/trec2011_2012_final.t
             text = re.sub(alphanumeric_regex, '', text)
             all_timestamps_ini.append(row[6])
             all_docs_ini.append(text)
+            all_topic_ids.append(row[0])
         line_count += 1
 print(all_docs_ini[:10])
 print(all_timestamps_ini[:10])
@@ -362,28 +364,32 @@ else:
     # Remove empty documents
     print('removing empty documents...')
 
-    def remove_empty(in_docs, in_timestamps):
+    def remove_empty(in_docs, in_timestamps, in_topic_ids):
         out_docs = []
         out_timestamps = []
+        out_topic_ids = []
         for ii, doc in enumerate(in_docs):
             if(doc!=[]):
                 out_docs.append(doc)
                 out_timestamps.append(in_timestamps[ii])
-        return out_docs, out_timestamps
+                out_topic_ids.append(in_topic_ids[ii])
+        return out_docs, out_timestamps, out_topic_ids
 
-    def remove_by_threshold(in_docs, in_timestamps, thr):
+    def remove_by_threshold(in_docs, in_timestamps, in_topic_ids, thr):
         out_docs = []
         out_timestamps = []
+        out_topic_ids = []
         for ii, doc in enumerate(in_docs):
             if(len(doc)>thr):
                 out_docs.append(doc)
                 out_timestamps.append(in_timestamps[ii])
-        return out_docs, out_timestamps
+                out_topic_ids.append(in_topic_ids[ii])
+        return out_docs, out_timestamps, out_topic_ids
 
-    docs, timestamps = remove_empty(docs, timestamps)
+    docs, timestamps, out_topic_ids = remove_empty(docs, timestamps, all_topic_ids)
 
     # Remove test documents with length=1
-    docs, timestamps = remove_by_threshold(docs, timestamps, 1)
+    docs, timestamps, out_topic_ids = remove_by_threshold(docs, timestamps, out_topic_ids, 1)
 
     # Getting lists of words and doc_indices
     print('creating lists of words...')
@@ -467,6 +473,11 @@ else:
 
     # Save timestamps alone
     savemat(path_save + 'bow_timestamps.mat', {'timestamps': timestamps}, do_compression=True)
+
+    # write topic ids
+    with open(path_save + 'topic_ids.txt', 'w') as fp:
+        for topic_id in out_topic_ids:
+            fp.write(topic_id + '\n')
 
     # Split bow intro token/value pairs
     print('splitting bow intro token/value pairs and saving to disk...')

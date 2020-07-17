@@ -319,9 +319,11 @@ def get_eta(source):
         if source == 'val':
             rnn_inp = valid_rnn_inp
             return _eta_helper(rnn_inp)
-        else:
+        elif source == 'test':
             rnn_1_inp = test_1_rnn_inp
             return _eta_helper(rnn_1_inp)
+        else:
+            return _eta_helper(source)
 
 def get_theta(eta, bows):
     model.eval()
@@ -472,6 +474,63 @@ def get_topic_quality():
         print('Topic Quality is: {}'.format(quality))
         print('#'*100)
 
+def get_cluster_quality():
+    """Returns cluster quality.
+    """
+
+    print('Getting vocabulary ...')
+    data_file = os.path.join(args.data_path, 'min_df_{}'.format(args.min_df))
+    vocab, cluster_valid = data.get_all_data(data_file, temporal=True)
+    vocab_size = len(vocab)
+    topics_distributions = []
+
+    # get data
+    print('Getting full data ...')
+    tokens = train['tokens']
+    counts = train['counts']
+    times = train['times']
+    num_times = len(np.unique(train_times))
+    num_docs = len(tokens)
+    rnn_inp = data.get_rnn_input(tokens, counts, times, num_times, vocab_size, num_docs)
+    model.eval()
+    with torch.no_grad():
+        indices = torch.split(torch.tensor(range(num_docs)), args.eval_batch_size)
+
+        eta = get_eta(rnn_inp)
+
+        acc_loss = 0
+        cnt = 0
+        for idx, ind in enumerate(indices):
+            data_batch, times_batch = data.get_batch(
+                tokens, counts, ind, vocab_size, args.emb_size, temporal=True, times=times)
+            sums = data_batch.sum(1).unsqueeze(1)
+            if args.bow_norm:
+                normalized_data_batch = data_batch / sums
+            else:
+                normalized_data_batch = data_batch
+
+            eta_td = eta[times_batch.type('torch.LongTensor')]
+            theta = get_theta(eta_td, normalized_data_batch)
+
+
+        print('\n')
+        print('Get topic coherence...')
+        print('train_tokens: ', train_tokens[0])
+        TC_all = []
+        cnt_all = []
+        for tt in range(args.num_times):
+            tc, cnt = get_topic_coherence(beta[:, tt, :].detach().numpy(), train_tokens, vocab)
+            TC_all.append(tc)
+            cnt_all.append(cnt)
+        print('TC_all: ', TC_all)
+        TC_all = torch.tensor(TC_all)
+        print('TC_all: ', TC_all.size())
+        print('\n')
+        print('Get topic quality...')
+        quality = tc * diversity
+        print('Topic Quality is: {}'.format(quality))
+        print('#'*100)
+
 if args.mode == 'train':
     ## train model on data by looping through multiple epochs
     best_epoch = 0
@@ -521,7 +580,8 @@ else:
         alpha = model.mu_q_alpha.detach().numpy()
         scipy.io.savemat(ckpt+'_alpha.mat', {'values': alpha}, do_compression=True)
 
-
+    print('compute clustering metrics')
+    get_cluster_quality()
     print('computing validation perplexity...')
     val_ppl = get_completion_ppl('val')
     print('computing test perplexity...')
