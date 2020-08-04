@@ -11,6 +11,11 @@ import os
 import re
 import nltk
 from nltk.corpus import stopwords
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--input")
+args = parser.parse_args()
 
 split_sets = False
 
@@ -32,22 +37,18 @@ stops = stopwords.words('english')
 
 # Read raw data
 print('reading raw data...')
-with open('/home/beck/Repositories/Data/trec2011_microblog/trec2011_2012_final.tsv') as csv_file:
-    csv_reader = csv.reader(csv_file, delimiter='\t', quotechar='"')
-    line_count = 0
-    all_timestamps_ini = []
-    all_docs_ini = []
-    all_topic_ids = []
-    for row in csv_reader:
-        # skip header#
-        if(line_count>0):
-            # remove urls
-            text = re.sub(http_regex, '', row[4]).strip()
-            text = re.sub(alphanumeric_regex, '', text)
-            all_timestamps_ini.append(row[6])
-            all_docs_ini.append(text)
-            all_topic_ids.append(row[0])
-        line_count += 1
+df = pd.read_csv(args.input, sep="\t")
+all_timestamps_ini = []
+all_docs_ini = []
+all_topic_ids = []
+line_count = 0
+for i in df.itertuples():
+    text = re.sub(http_regex, '', i.full_text).strip()
+    text = re.sub(alphanumeric_regex, '', text)
+    all_docs_ini.append(text)
+    all_timestamps_ini.append(str(i.date))
+    all_topic_ids.append(str(i.topicId))
+
 print(all_docs_ini[:10])
 print(all_timestamps_ini[:10])
 
